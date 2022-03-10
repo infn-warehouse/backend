@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 import express from 'express';
 import { postgraphile } from 'postgraphile';
 import PgOrderByRelatedPlugin from "@graphile-contrib/pg-order-by-related";
+import ConnectionFilterPlugin from "postgraphile-plugin-connection-filter";
 import ldap from 'ldapjs';
 import assert from 'assert';
 import expressJwt from 'express-jwt';
@@ -197,7 +198,7 @@ app.use(postgraphile(
       pgSettings: async req => ({
         'role': req.user.role,
       }),
-      appendPlugins: [PgOrderByRelatedPlugin]
+      appendPlugins: [PgOrderByRelatedPlugin,ConnectionFilterPlugin]
     }
 ));
 
