@@ -191,6 +191,9 @@ app.use(postgraphile(
     process.env.DATABASE_URL || "postgres://user:pass@host:5432/dbname",
     "public",
     {
+      graphileBuildOptions: {
+        connectionFilterRelations: true
+      },
       watchPg: true,
       graphiql: true,
       enhanceGraphiql: true,
