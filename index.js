@@ -9,9 +9,11 @@ import expressJwt from 'express-jwt';
 import jwt from 'jsonwebtoken';
 import morgan from 'morgan';
 import cors from 'cors'
+import _ from "lodash";
+
 
 function generateAccessToken(payload) {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '3600s' });
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 }
 
 // load env file
@@ -181,9 +183,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/prova',
+app.get('/userdata',
   function(req, res) {
-    res.sendStatus(200).json({ message: "Ottimo!" });
+    // res.sendStatus(200).json({ message: "Ottimo!" });
+    let user=_.cloneDeep(req.user);
+    delete user.password;
+    res.status(200).json(user);
   }
 );
 
