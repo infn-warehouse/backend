@@ -10,19 +10,30 @@ import jwt from 'jsonwebtoken';
 import morgan from 'morgan';
 import cors from 'cors'
 import _ from "lodash";
-
-
-function generateAccessToken(payload) {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
-}
+import { AuthType, createClient } from "webdav";
+import multer from 'multer';
+import fs from 'fs';
+import asyncHandler from './asyncHandler.js';
 
 // load env file
 dotenv.config();
-
 console.log("DATABASE_URL: "+process.env.DATABASE_URL)
 
 let roles=["v_visitatore"];
 
+//multer
+const upload = multer({ dest: 'uploads/' })
+
+// webdav
+const webdavClient = createClient(process.env.WEBDAV_URL, {
+  // authType: AuthType.Digest,
+  username: process.env.WEBDAV_USERNAME,
+  password: process.env.WEBDAV_PASSWORD
+});
+
+function generateAccessToken(payload) {
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+}
 
 // ldap
 function ldapSearch(client,base,filter=null,attributes=[]) {
@@ -144,6 +155,15 @@ function aa(email,password,dn,prefix) {
 // express
 const app = express();
 
+
+async (req, res, next) => {
+  try {
+    return await fn(req, res, next)
+  } catch (err) {
+    next(err)
+  }
+}
+
 app.use(cors())
 
 app.use(express.json())
@@ -151,7 +171,7 @@ app.use(express.json())
 app.use(morgan('combined'));
 
 app.post('/login',
-  async function(req, res) {
+  asyncHandler(async function(req, res) {
     if (!req.body) return res.status(400).json({ message: "Missing body" });
     if (!req.body.email) return res.status(400).json({ message: "No email supplied" });
     if (!req.body.password) return res.status(400).json({ message: "No password supplied" });
@@ -170,7 +190,7 @@ app.post('/login',
       role: role.replace(":","_")
     });
     res.json(token);
-  }
+  })
 );
 
 app.use(expressJwt({secret: process.env.JWT_SECRET, algorithms: ['HS256']}));
@@ -183,13 +203,36 @@ app.use((req, res, next) => {
   next();
 });
 
+
+
+app.get('/scans/:filename',
+  asyncHandler(async function(req, res) {
+    let file=await webdavClient.getFileContents("/"+req.params.filename);
+    res.status(200).send(file);
+  })
+);
+app.post('/scans/:filename',upload.single('data'),
+  asyncHandler(async function(req, res) {
+    let data = fs.readFileSync(req.file.path);
+    let file=await webdavClient.putFileContents("/"+req.params.filename,data);
+    res.status(200).send("OK");
+  })
+);
+app.delete('/scans/:filename',
+  asyncHandler(async function(req, res) {
+    let file=await webdavClient.deleteFile("/"+req.params.filename);
+    res.status(200).send("OK");
+  })
+);
+
+
 app.get('/userdata',
-  function(req, res) {
+  asyncHandler(function(req, res) {
     // res.sendStatus(200).json({ message: "Ottimo!" });
     let user=_.cloneDeep(req.user);
     delete user.password;
     res.status(200).json(user);
-  }
+  })
 );
 
 app.use(postgraphile(
