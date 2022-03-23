@@ -11,18 +11,15 @@ import morgan from 'morgan';
 import cors from 'cors'
 import _ from "lodash";
 import { AuthType, createClient } from "webdav";
-import multer from 'multer';
 import fs from 'fs';
 import asyncHandler from './asyncHandler.js';
+import busboy from 'busboy';
 
 // load env file
 dotenv.config();
 console.log("DATABASE_URL: "+process.env.DATABASE_URL)
 
 let roles=["v_visitatore"];
-
-//multer
-const upload = multer({ dest: 'uploads/' })
 
 // webdav
 const webdavClient = createClient(process.env.WEBDAV_URL, {
@@ -204,21 +201,33 @@ app.use((req, res, next) => {
 });
 
 
+app.get('/alfresco/:filename',
+  asyncHandler(async function(req, res) {
+    res.attachment(req.params.filename);
+    webdavClient.createReadStream("/"+req.params.filename).pipe(res);
+  })
+);
+app.put('/alfresco/:filename',
+  asyncHandler(async function(req, res) {
+    const bb = busboy({ headers: req.headers });
+    bb.on('file', (fieldname, file, info) => {
+      console.log(`Upload of '${info.filename}' started`);
 
-app.get('/scans/:filename',
-  asyncHandler(async function(req, res) {
-    let file=await webdavClient.getFileContents("/"+req.params.filename);
-    res.status(200).send(file);
+      // Create a write stream of the new file
+      const wstream = webdavClient.createWriteStream("/"+req.params.filename);
+
+      // On finish of the upload
+      file.on('close', () => {
+        console.log(`Upload of '${info.filename}' finished`);
+        res.status(200).send("OK");
+      });
+      // Pipe it trough
+      file.pipe(wstream);
+    });
+    req.pipe(bb);
   })
 );
-app.post('/scans/:filename',upload.single('data'),
-  asyncHandler(async function(req, res) {
-    let data = fs.readFileSync(req.file.path);
-    let file=await webdavClient.putFileContents("/"+req.params.filename,data);
-    res.status(200).send("OK");
-  })
-);
-app.delete('/scans/:filename',
+app.delete('/alfrescoalfresco/:filename',
   asyncHandler(async function(req, res) {
     let file=await webdavClient.deleteFile("/"+req.params.filename);
     res.status(200).send("OK");
