@@ -268,7 +268,7 @@ app.use(postgraphile(
 ));
 
 app.use(function(err, req, res, next) {
-  console.error(err.stack);
+  console.error(err);
   res.status(500).send(err.toString());
 });
 
