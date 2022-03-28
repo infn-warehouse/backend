@@ -204,11 +204,15 @@ app.use((req, res, next) => {
 app.get('/alfresco/:filename',
   asyncHandler(async function(req, res) {
     res.attachment(req.params.filename);
-    webdavClient.createReadStream("/"+req.params.filename).pipe(res);
+    const rstream=webdavClient.createReadStream("/"+req.params.filename);
+    rstream.on('error', function (err) {
+      next(err);
+    });
+    rstream.pipe(res);
   })
 );
 app.put('/alfresco/:filename',
-  asyncHandler(async function(req, res) {
+  asyncHandler(async function(req, res, next) {
     const bb = busboy({ headers: req.headers });
     bb.on('file', (fieldname, file, info) => {
       console.log(`Upload of '${info.filename}' started`);
@@ -220,6 +224,9 @@ app.put('/alfresco/:filename',
       file.on('close', () => {
         console.log(`Upload of '${info.filename}' finished`);
         res.status(200).send("OK");
+      });
+      wstream.on('error', function (err) {
+        next(err);
       });
       // Pipe it trough
       file.pipe(wstream);
@@ -261,6 +268,11 @@ app.use(postgraphile(
       appendPlugins: [PgOrderByRelatedPlugin,ConnectionFilterPlugin]
     }
 ));
+
+app.use(function(err, req, res, next) {
+  console.error(err.stack);
+  res.status(500).send(err.toString());
+});
 
 app.listen(process.env.PORT || 3000, () => {
   console.log('Server running on port %d', process.env.PORT);
