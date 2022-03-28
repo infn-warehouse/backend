@@ -123,7 +123,7 @@ function aa(email,password,prefix) {
     });
 
     try {
-      res=await ldapSearch(client,process.env.BASE_SEARCH,'mail='+email);
+      res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
     }
     catch (err) {
       reject({ reason: "search", err });
