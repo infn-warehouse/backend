@@ -268,8 +268,8 @@ app.use(postgraphile(
 ));
 
 app.use(function(err, req, res, next) {
-  console.error(err.stack);
-  res.status(500).send(err.toString());
+  console.error(err);
+  res.status(500).send(err);
 });
 
 var privateKey  = fs.readFileSync(process.env.KEY_FILE, 'utf8');
