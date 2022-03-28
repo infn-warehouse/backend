@@ -96,8 +96,12 @@ function aa(email,password,dn,prefix) {
       reject({reason: "LDAP connection error",err});
     });
 
+    let field="mail";
+    if  (!email.includes("@"))
+      field="uid";
+
     try {
-      res=await ldapSearch(client,process.env.BASE_SEARCH,'mail='+email);
+      res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
     }
     catch (err) {
       reject({ reason: "search", err });
@@ -173,14 +177,7 @@ app.post('/login',
     if (!req.body.email) return res.status(400).json({ message: "No email supplied" });
     if (!req.body.password) return res.status(400).json({ message: "No password supplied" });
 
-    let dn,role;
-    try {
-      //dn=await getDn(req.body.email);
-      role=await aa(req.body.email,req.body.password,dn,process.env.AA_PREFIX);
-    }
-    catch (err) {
-      return res.status(500).json(err);
-    }
+    let role=await aa(req.body.email,req.body.password,dn,process.env.AA_PREFIX);
     const token = generateAccessToken({
       email: req.body.email,
       password: req.body.password,
@@ -234,7 +231,7 @@ app.put('/alfresco/:filename',
     req.pipe(bb);
   })
 );
-app.delete('/alfrescoalfresco/:filename',
+app.delete('/alfresco/:filename',
   asyncHandler(async function(req, res) {
     let file=await webdavClient.deleteFile("/"+req.params.filename);
     res.status(200).send("OK");
