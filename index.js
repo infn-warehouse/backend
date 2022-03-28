@@ -14,6 +14,7 @@ import { AuthType, createClient } from "webdav";
 import fs from 'fs';
 import asyncHandler from './asyncHandler.js';
 import busboy from 'busboy';
+import https from 'https'
 
 // load env file
 dotenv.config();
@@ -83,7 +84,7 @@ function ldapSearch(client,base,filter=null,attributes=[]) {
   });
 }
 
-function aa(email,password,dn,prefix) {
+function aa(email,password,prefix) {
   return new Promise(async (resolve,reject) => {
     let res;
 
@@ -177,7 +178,7 @@ app.post('/login',
     if (!req.body.email) return res.status(400).json({ message: "No email supplied" });
     if (!req.body.password) return res.status(400).json({ message: "No password supplied" });
 
-    let role=await aa(req.body.email,req.body.password,dn,process.env.AA_PREFIX);
+    let role=await aa(req.body.email,req.body.password,process.env.AA_PREFIX);
     const token = generateAccessToken({
       email: req.body.email,
       password: req.body.password,
@@ -199,7 +200,7 @@ app.use((req, res, next) => {
 
 
 app.get('/alfresco/:filename',
-  asyncHandler(async function(req, res) {
+  asyncHandler(async function(req, res, next) {
     res.attachment(req.params.filename);
     const rstream=webdavClient.createReadStream("/"+req.params.filename);
     rstream.on('error', function (err) {
@@ -232,7 +233,7 @@ app.put('/alfresco/:filename',
   })
 );
 app.delete('/alfresco/:filename',
-  asyncHandler(async function(req, res) {
+  asyncHandler(async function(req, res, next) {
     let file=await webdavClient.deleteFile("/"+req.params.filename);
     res.status(200).send("OK");
   })
@@ -271,6 +272,11 @@ app.use(function(err, req, res, next) {
   res.status(500).send(err.toString());
 });
 
-app.listen(process.env.PORT || 3000, () => {
+var privateKey  = fs.readFileSync(process.env.KEY_FILE, 'utf8');
+var certificate = fs.readFileSync(process.env.CERT_FILE, 'utf8');
+var credentials = {key: privateKey, cert: certificate};
+
+var httpsServer = https.createServer(credentials, app);
+httpsServer.listen(process.env.PORT || 8443, () => {
   console.log('Server running on port %d', process.env.PORT);
 });
