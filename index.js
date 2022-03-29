@@ -23,11 +23,13 @@ console.log("DATABASE_URL: "+process.env.DATABASE_URL)
 let roles=["v_visitatore"];
 
 // webdav
-const webdavClient = createClient(process.env.WEBDAV_URL, {
-  // authType: AuthType.Digest,
-  username: process.env.WEBDAV_USERNAME,
-  password: process.env.WEBDAV_PASSWORD
-});
+function createWebdavClient(username,password) {
+  return createClient(process.env.WEBDAV_URL, {
+    // authType: AuthType.Digest,
+    username: username,
+    password: password
+  });
+}
 
 function generateAccessToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
@@ -130,26 +132,30 @@ function aa(email,password,prefix) {
       return;
     }
 
+    let role;
+
     if (!res[0].isMemberOf) {
       reject({ reason: "No isMemberOf" });
       return;
     }
 
     if (Array.isArray(res[0].isMemberOf)) {
-      let output = res[0].isMemberOf.filter(function (isMemberOf) {
+      role = res[0].isMemberOf.filter(function (isMemberOf) {
         return isMemberOf.startsWith(prefix);
       });
-      output=output.map(function (isMemberOf) {
+      role=role.map(function (isMemberOf) {
         return isMemberOf.substring(prefix.length);
       });
-
-      console.log(output);
-      resolve(output);
     }
     else {
-      let output=res[0].isMemberOf.substring(prefix.length);
-      resolve(output);
+      role=res[0].isMemberOf.substring(prefix.length);
     }
+
+    resolve({
+      role,
+      uid: res[0].uid,
+      email: res[0].mail
+    });
   });
 }
 
@@ -178,11 +184,12 @@ app.post('/login',
     if (!req.body.email) return res.status(400).json({ message: "No email supplied" });
     if (!req.body.password) return res.status(400).json({ message: "No password supplied" });
 
-    let role=await aa(req.body.email,req.body.password,process.env.AA_PREFIX);
+    let data=await aa(req.body.email,req.body.password,process.env.AA_PREFIX);
     const token = generateAccessToken({
-      email: req.body.email,
+      email: data.email,
+      uid: data.uid,
       password: req.body.password,
-      role: role.replace(":","_")
+      role: data.role.replace(":","_")
     });
     res.json(token);
   })
@@ -201,6 +208,8 @@ app.use((req, res, next) => {
 
 app.get('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
+    let webdavClient=createWebdavClient(req.user.uid,req.user.password);
+
     res.attachment(req.params.filename);
     const rstream=webdavClient.createReadStream("/"+req.params.filename);
     rstream.on('error', function (err) {
@@ -211,6 +220,8 @@ app.get('/alfresco/:filename',
 );
 app.put('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
+    let webdavClient=createWebdavClient(req.user.uid,req.user.password);
+
     const bb = busboy({ headers: req.headers });
     bb.on('file', (fieldname, file, info) => {
       console.log(`Upload of '${info.filename}' started`);
@@ -234,6 +245,8 @@ app.put('/alfresco/:filename',
 );
 app.delete('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
+    let webdavClient=createWebdavClient(req.user.uid,req.user.password);
+
     let file=await webdavClient.deleteFile("/"+req.params.filename);
     res.status(200).send("OK");
   })
@@ -268,8 +281,14 @@ app.use(postgraphile(
 ));
 
 app.use(function(err, req, res, next) {
-  console.error(err);
-  res.status(500).send(err);
+  if ('stack' in err) {
+    console.error(err.stack);
+    res.status(500).send(err.stack);
+  }
+  else {
+    console.error(err);
+    res.status(500).send(err);
+  }
 });
 
 var privateKey  = fs.readFileSync(process.env.KEY_FILE, 'utf8');
