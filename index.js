@@ -20,8 +20,6 @@ import https from 'https'
 dotenv.config();
 console.log("DATABASE_URL: "+process.env.DATABASE_URL)
 
-let roles=["v_visitatore"];
-
 // webdav
 function createWebdavClient(username,password) {
   return createClient(process.env.WEBDAV_URL, {
@@ -131,7 +129,7 @@ function aa(email,password,prefix) {
       reject({ reason: "search", err });
       return;
     }
-
+    
     let role;
 
     if (!res[0].isMemberOf) {
@@ -140,12 +138,14 @@ function aa(email,password,prefix) {
     }
 
     if (Array.isArray(res[0].isMemberOf)) {
-      role = res[0].isMemberOf.filter(function (isMemberOf) {
+      let temp = res[0].isMemberOf.filter(function (isMemberOf) {
         return isMemberOf.startsWith(prefix);
       });
-      role=role.map(function (isMemberOf) {
-        return isMemberOf.substring(prefix.length);
-      });
+      if (temp.length==0) {
+        reject({ reason: "No role found" });
+        return;
+      }
+      role=temp[0].substring(prefix.length);
     }
     else {
       role=res[0].isMemberOf.substring(prefix.length);
@@ -189,7 +189,7 @@ app.post('/login',
       email: data.email,
       uid: data.uid,
       password: req.body.password,
-      role: data.role.replace(":","_")
+      role: data.role.replace(":","_").replace("|","_")
     });
     res.json(token);
   })
@@ -197,13 +197,13 @@ app.post('/login',
 
 app.use(expressJwt({secret: process.env.JWT_SECRET, algorithms: ['HS256']}));
 
-app.use((req, res, next) => {
-  if (roles.length && !roles.includes(req.user.role)) {
-    // user's role is not authorized
-    return res.status(401).json({ message: "Unauthorized Access" });
-  }
-  next();
-});
+// app.use((req, res, next) => {
+//   if (roles.length && !roles.includes(req.user.role)) {
+//     // user's role is not authorized
+//     return res.status(401).json({ message: "Unauthorized Access" });
+//   }
+//   next();
+// });
 
 
 app.get('/alfresco/:filename',
