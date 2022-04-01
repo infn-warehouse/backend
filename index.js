@@ -265,9 +265,9 @@ app.put('/alfresco/:filename',
                 alfresco: {
                   user: "${req.user.email}",
                   name: "${req.params.filename}",
-                  link: "${removeCredentials(
+                  link: "${
                     webdavClient.getFileDownloadLink("/"+req.params.filename)
-                  )}"
+                  }"
                 }
               }
             ) {
