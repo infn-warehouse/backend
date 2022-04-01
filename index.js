@@ -45,6 +45,19 @@ function generateAccessToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
 }
 
+function removeCredentials(url) {
+  let split1 = url.split("//");
+  let protocol=split1[0];
+  split1.splice(0,1);
+  let join1=split1.join("//");
+
+  let split2=join1.split("@");
+  split2.splice(0,1);
+  let join2=split2.join("@");
+
+  return protocol+"//"+join2;
+}
+
 // ldap
 function ldapSearch(client,base,filter=null,attributes=[]) {
   return new Promise(async (resolve,reject) => {
@@ -252,7 +265,9 @@ app.put('/alfresco/:filename',
                 alfresco: {
                   user: "${req.user.email}",
                   name: "${req.params.filename}",
-                  link: "${webdavClient.getFileDownloadLink("/"+req.params.filename)}"
+                  link: "${removeCredentials(
+                    webdavClient.getFileDownloadLink("/"+req.params.filename)
+                  )}"
                 }
               }
             ) {
