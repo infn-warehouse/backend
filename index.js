@@ -15,10 +15,22 @@ import fs from 'fs';
 import asyncHandler from './asyncHandler.js';
 import busboy from 'busboy';
 import https from 'https'
+import { makeQueryRunner } from "./QueryRunner.cjs";
 
 // load env file
 dotenv.config();
 console.log("DATABASE_URL: "+process.env.DATABASE_URL)
+
+// graphile
+const runner = await makeQueryRunner(
+  process.env.DATABASE_URL || "postgres://user:pass@host:5432/dbname",
+  "public",
+  {
+    pgSettings: async req => ({
+      'role': req.user.role,
+    }),
+  }
+);
 
 // webdav
 function createWebdavClient(username,password) {
@@ -230,8 +242,30 @@ app.put('/alfresco/:filename',
       const wstream = webdavClient.createWriteStream("/"+req.params.filename);
 
       // On finish of the upload
-      file.on('close', () => {
+      file.on('close', async () => {
         console.log(`Upload of '${info.filename}' finished`);
+
+        const result = await runner.query(req,`
+          mutation {
+            createAlfresco(
+              input: {
+                alfresco: {
+                  user: "${req.user.email}",
+                  name: "${req.params.filename}",
+                  link: "${webdavClient.getFileDownloadLink("/"+req.params.filename)}"
+                }
+              }
+            ) {
+              alfresco {
+                user
+                link
+              }
+            }
+          }`,
+          { role: req.user.role }
+        );
+        console.log(result);
+
         res.status(200).send("OK");
       });
       wstream.on('error', function (err) {
