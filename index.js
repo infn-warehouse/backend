@@ -73,7 +73,7 @@ function ldapSearch(client,base,filter=null,attributes=[]) {
       if (err) {
         reject({
           reason: "err",
-          status: err
+          err
         });
         return;
       }
@@ -118,68 +118,73 @@ function aa(email,password,prefix) {
     });
     
     client.on('error', (err) => {
+      console.log("LDAP general error");
+    });
+    client.on('connectError', (err) => {
       // handle connection error
       reject({reason: "LDAP connection error",err});
     });
-
-    let field="mail";
-    if  (!email.includes("@"))
-      field="uid";
-
-    try {
-      res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
-    }
-    catch (err) {
-      reject({ reason: "search", err });
-      return;
-    }
-
-    if (res.length==0) {
-      reject({ reason: "No user" });
-      return;
-    }
-
-    let dn=res[0].dn;
-
-    client.bind(dn, password, (err) => {
-      // handle bind error
-      if (err)
-        reject({reason: "LDAP bind error", err});
-    });
-
-    try {
-      res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
-    }
-    catch (err) {
-      reject({ reason: "search", err });
-      return;
-    }
-    
-    let role;
-
-    if (!res[0].isMemberOf) {
-      reject({ reason: "No isMemberOf" });
-      return;
-    }
-
-    if (Array.isArray(res[0].isMemberOf)) {
-      let temp = res[0].isMemberOf.filter(function (isMemberOf) {
-        return isMemberOf.startsWith(prefix);
-      });
-      if (temp.length==0) {
-        reject({ reason: "No role found" });
+    client.on('connect', async () => {
+      let field="mail";
+      if  (!email.includes("@"))
+        field="uid";
+  
+      try {
+        res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
+      }
+      catch (err) {
+        reject({ reason: "search", err });
         return;
       }
-      role=temp[0].substring(prefix.length);
-    }
-    else {
-      role=res[0].isMemberOf.substring(prefix.length);
-    }
-
-    resolve({
-      role,
-      uid: res[0].uid,
-      email: res[0].mail
+  
+      if (res.length==0) {
+        reject({ reason: "No user" });
+        return;
+      }
+  
+      let dn=res[0].dn;
+  
+      client.bind(dn, password, async (err) => {
+        // handle bind error
+        if (err)
+          reject({reason: "LDAP bind error", err});
+        else {
+          try {
+            res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
+          }
+          catch (err) {
+            reject({ reason: "search", err });
+            return;
+          }
+          
+          let role;
+      
+          if (!res[0].isMemberOf) {
+            reject({ reason: "No isMemberOf" });
+            return;
+          }
+      
+          if (Array.isArray(res[0].isMemberOf)) {
+            let temp = res[0].isMemberOf.filter(function (isMemberOf) {
+              return isMemberOf.startsWith(prefix);
+            });
+            if (temp.length==0) {
+              reject({ reason: "No role found" });
+              return;
+            }
+            role=temp[0].substring(prefix.length);
+          }
+          else {
+            role=res[0].isMemberOf.substring(prefix.length);
+          }
+      
+          resolve({
+            role,
+            uid: res[0].uid,
+            email: res[0].mail
+          });
+        }
+      });
     });
   });
 }
