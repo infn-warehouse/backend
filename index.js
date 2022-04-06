@@ -179,7 +179,7 @@ function aa(email,password,prefix) {
           }
       
           resolve({
-            role,
+            role: "v_visitatore", // TEMP: for test purposes
             uid: res[0].uid,
             email: res[0].mail
           });
@@ -240,7 +240,10 @@ app.get('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
     let webdavClient=createWebdavClient(req.user.uid,req.user.password);
 
+    const stat = await webdavClient.stat("/"+req.params.filename);
     res.attachment(req.params.filename);
+    res.setHeader('Content-Length', stat.size);
+
     const rstream=webdavClient.createReadStream("/"+req.params.filename);
     rstream.on('error', function (err) {
       next(err);
