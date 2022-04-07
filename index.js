@@ -16,6 +16,7 @@ import asyncHandler from './asyncHandler.js';
 import busboy from 'busboy';
 import https from 'https'
 import { makeQueryRunner } from "./QueryRunner.cjs";
+import meter from 'stream-meter';
 
 // load env file
 dotenv.config();
@@ -269,6 +270,7 @@ app.put('/alfresco/:filename',
 
       // Create a write stream of the new file
       const wstream = webdavClient.createWriteStream("/"+req.params.filename);
+      let m = meter();
 
       // On finish of the upload
       file.on('close', async () => {
@@ -281,12 +283,14 @@ app.put('/alfresco/:filename',
                 alfresco: {
                   user: "${req.user.email}",
                   name: "${req.params.filename}",
+                  size: ${m.bytes}
                 }
               }
             ) {
               alfresco {
                 user
                 name
+                size
               }
             }
           }`,
@@ -300,7 +304,7 @@ app.put('/alfresco/:filename',
         next(err);
       });
       // Pipe it trough
-      file.pipe(wstream);
+      file.pipe(m).pipe(wstream);
     });
     req.pipe(bb);
   })
