@@ -251,6 +251,14 @@ app.get('/alfresco/:filename',
     rstream.pipe(res);
   })
 );
+app.get('/alfresco/:filename/link',
+  asyncHandler(async function(req, res, next) {
+    let webdavClient=createWebdavClient(req.user.uid,req.user.password);
+
+    let link=webdavClient.getFileDownloadLink("/"+req.params.filename);
+    res.status(200).send(link);
+  })
+);
 app.put('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
     let webdavClient=createWebdavClient(req.user.uid,req.user.password);
@@ -273,15 +281,12 @@ app.put('/alfresco/:filename',
                 alfresco: {
                   user: "${req.user.email}",
                   name: "${req.params.filename}",
-                  link: "${
-                    webdavClient.getFileDownloadLink("/"+req.params.filename)
-                  }"
                 }
               }
             ) {
               alfresco {
                 user
-                link
+                name
               }
             }
           }`,
