@@ -17,6 +17,7 @@ import busboy from 'busboy';
 import https from 'https'
 import { makeQueryRunner } from "./QueryRunner.cjs";
 import meter from 'stream-meter';
+import bodyParser from 'body-parser'
 
 // load env file
 dotenv.config();
@@ -203,9 +204,11 @@ async (req, res, next) => {
   }
 }
 
-app.use(cors())
+app.use(cors());
 
-app.use(express.json())
+app.use(express.json());
+
+app.use(bodyParser.text());
 
 app.use(morgan('combined'));
 
@@ -325,6 +328,67 @@ app.get('/userdata',
     let user=_.cloneDeep(req.user);
     delete user.password;
     res.status(200).json(user);
+  })
+);
+app.get('/prefs/:name',
+  asyncHandler(async function(req, res) {
+    const result = await runner.query(req,`
+      {
+        allPreferences (condition: { role:"${req.user.role}" pref:"${req.params.name}" }) {
+          nodes {
+            value
+          }
+        }
+      }`
+    );
+
+    if (result.errors)
+      res.status(500).send(result);
+    else
+      res.status(200).send(result.data.allPreferences.nodes[0].value);
+  })
+);
+app.put('/prefs/:name',
+  asyncHandler(async function(req, res) {
+    if (!req.body) return res.status(400).json({ message: "Missing body" });
+
+    const resultDel = await runner.query(req,`
+      mutation {
+        deletePreferenceByRoleAndPref(input: { role: "${req.user.role}" pref: "${req.params.name}" }) {
+          deletedPreferenceId
+        }
+      }`
+    );
+
+    if (resultDel.errors && !resultDel.errors[0].message.includes("because no values you can delete were found matching these criteria")) {
+      res.status(500).send(resultDel);
+      return;
+    }
+
+    const result = await runner.query(req,`
+      mutation {
+        createPreference(
+          input: {
+            preference: {
+              role: "${req.user.role}",
+              pref: "${req.params.name}",
+              value: "${req.body}"
+            }
+          }
+        ) {
+          preference {
+            role
+            pref
+            value
+          }
+        }
+      }`
+    );
+    
+    if (result.errors)
+      res.status(500).send(result);
+    else
+      res.status(200).send("OK");
   })
 );
 
