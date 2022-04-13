@@ -344,6 +344,8 @@ app.get('/prefs/:name',
 
     if (result.errors)
       res.status(500).send(result);
+    else if (result.data.allPreferences.nodes.length==0)
+      res.status(200).send("");
     else
       res.status(200).send(result.data.allPreferences.nodes[0].value);
   })
