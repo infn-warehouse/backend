@@ -74,7 +74,7 @@ function ldapSearch(client,base,filter=null,attributes=[]) {
     client.search(base, opts, (err, res) => {
       if (err) {
         reject({
-          reason: "err",
+          searchError: "ERR",
           err
         });
         return;
@@ -93,7 +93,7 @@ function ldapSearch(client,base,filter=null,attributes=[]) {
       res.on('error', (err) => {
         //console.error('error: ' + err.message);
         reject({
-          reason: "err",
+          searchError: "ERROR_EVENT",
           err
         });
       });
@@ -103,7 +103,7 @@ function ldapSearch(client,base,filter=null,attributes=[]) {
           resolve(output);
         else
           reject({
-            reason: "end",
+            searchError: "END",
             status: result.status
           });
       });
@@ -124,7 +124,7 @@ function aa(email,password,prefix) {
     });
     client.on('connectError', (err) => {
       // handle connection error
-      reject({reason: "LDAP connection error",err});
+      reject({aaError: "CONN_ERROR",err});
     });
     client.on('connect', async () => {
       let field="mail";
@@ -135,12 +135,12 @@ function aa(email,password,prefix) {
         res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
       }
       catch (err) {
-        reject({ reason: "search", err });
+        reject({ aaError: "SEARCH_ERROR", err });
         return;
       }
   
       if (res.length==0) {
-        reject({ reason: "No user" });
+        reject({ aaError: "NO_USER" });
         return;
       }
   
@@ -149,20 +149,20 @@ function aa(email,password,prefix) {
       client.bind(dn, password, async (err) => {
         // handle bind error
         if (err)
-          reject({reason: "LDAP bind error", err});
+          reject({aaError: "BIND_ERROR", err});
         else {
           try {
             res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
           }
           catch (err) {
-            reject({ reason: "search", err });
+            reject({ aaError: "SEARCH_ERROR", err });
             return;
           }
           
           let role;
       
           if (!res[0].isMemberOf) {
-            reject({ reason: "No isMemberOf" });
+            reject({ aaError: "NO_ATTRIBUTE" });
             return;
           }
       
@@ -171,7 +171,7 @@ function aa(email,password,prefix) {
               return isMemberOf.startsWith(prefix);
             });
             if (temp.length==0) {
-              reject({ reason: "No role found" });
+              reject({ aaError: "NO_ROLE" });
               return;
             }
             role=temp[0].substring(prefix.length);
