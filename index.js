@@ -413,7 +413,10 @@ app.use(postgraphile(
 ));
 
 app.use(function(err, req, res, next) {
-  if ('stack' in err) {
+  if (err.name == 'UnauthorizedError') {
+    res.status(401).send('Invalid token');
+  }
+  else if ('stack' in err) {
     console.error(err.stack);
     res.status(500).send(err.stack);
   }
