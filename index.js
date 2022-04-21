@@ -332,22 +332,56 @@ app.get('/userdata',
 );
 app.get('/prefs/:name',
   asyncHandler(async function(req, res) {
-    const result = await runner.query(req,`
-      {
-        allPreferences (condition: { role:"${req.user.role}" pref:"${req.params.name}" }) {
-          nodes {
-            value
+    const getPref=async function(user,pref) {
+      const result=await runner.query(req,`
+        {
+          allPreferences (condition: { user:"${user}" pref:"${pref}" }) {
+            nodes {
+              value
+            }
           }
-        }
-      }`
-    );
+        }`
+      );
+      if (result.errors)
+        return result;
+      if (result.data.allPreferences.nodes.length==0)
+        return null;
+      return result.data.allPreferences.nodes[0].value;
+    };
 
-    if (result.errors)
+    let result;
+    
+    result=await getPref(req.user.uid,req.params.name);
+    if (result && result.errors) {
       res.status(500).send(result);
-    else if (result.data.allPreferences.nodes.length==0)
-      res.status(200).send("");
-    else
-      res.status(200).send(result.data.allPreferences.nodes[0].value);
+      return;
+    }
+    if (result) {
+      res.status(200).send(result);
+      return;
+    }
+
+    result=await getPref("@"+req.user.role,req.params.name);
+    if (result && result.errors) {
+      res.status(500).send(result);
+      return;
+    }
+    if (result) {
+      res.status(200).send(result);
+      return;
+    }
+
+    result=await getPref("*",req.params.name);
+    if (result && result.errors) {
+      res.status(500).send(result);
+      return;
+    }
+    if (result) {
+      res.status(200).send(result);
+      return;
+    }
+
+    res.status(200).send("");
   })
 );
 app.put('/prefs/:name',
@@ -356,7 +390,7 @@ app.put('/prefs/:name',
 
     const resultDel = await runner.query(req,`
       mutation {
-        deletePreferenceByRoleAndPref(input: { role: "${req.user.role}" pref: "${req.params.name}" }) {
+        deletePreferenceByUserAndPref(input: { user: "${req.user.uid}" pref: "${req.params.name}" }) {
           deletedPreferenceId
         }
       }`
@@ -372,14 +406,14 @@ app.put('/prefs/:name',
         createPreference(
           input: {
             preference: {
-              role: "${req.user.role}",
+              user: "${req.user.uid}",
               pref: "${req.params.name}",
               value: "${req.body}"
             }
           }
         ) {
           preference {
-            role
+            user
             pref
             value
           }
