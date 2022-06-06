@@ -267,7 +267,11 @@ app.put('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
     let webdavClient=createWebdavClient(req.user.uid,req.user.password);
 
+    let fileGroup;
     const bb = busboy({ headers: req.headers });
+    bb.on('field', (name, val, info) => {
+      if (name=="fileGroup") fileGroup=val;
+    });
     bb.on('file', (fieldname, file, info) => {
       console.log(`Upload of '${info.filename}' started`);
 
@@ -286,7 +290,8 @@ app.put('/alfresco/:filename',
                 alfresco: {
                   user: "${req.user.email}",
                   name: "${req.params.filename}",
-                  size: ${m.bytes}
+                  size: "${m.bytes}",
+                  fileGroup: "${fileGroup}"
                 }
               }
             ) {
