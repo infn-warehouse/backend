@@ -111,7 +111,7 @@ function ldapSearch(client,base,filter=null,attributes=[]) {
   });
 }
 
-function aa(email,password,prefix) {
+function aa(username,password,prefix) {
   return new Promise(async (resolve,reject) => {
     let res;
 
@@ -127,12 +127,13 @@ function aa(email,password,prefix) {
       reject({aaError: "CONN_ERROR",err});
     });
     client.on('connect', async () => {
-      let field="mail";
-      if  (!email.includes("@"))
-        field="uid";
+      // let field="mail";
+      // if  (!username.includes("@"))
+      //   field="uid";
+      let field="uid";
   
       try {
-        res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
+        res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+username);
       }
       catch (err) {
         reject({ aaError: "SEARCH_ERROR", err });
@@ -152,7 +153,7 @@ function aa(email,password,prefix) {
           reject({aaError: "BIND_ERROR", err});
         else {
           try {
-            res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+email);
+            res=await ldapSearch(client,process.env.BASE_SEARCH,field+'='+username);
           }
           catch (err) {
             reject({ aaError: "SEARCH_ERROR", err });
@@ -215,10 +216,10 @@ app.use(morgan('combined'));
 app.post('/login',
   asyncHandler(async function(req, res) {
     if (!req.body) return res.status(400).json({ message: "Missing body" });
-    if (!req.body.email) return res.status(400).json({ message: "No email supplied" });
+    if (!req.body.username) return res.status(400).json({ message: "No username supplied" });
     if (!req.body.password) return res.status(400).json({ message: "No password supplied" });
 
-    let data=await aa(req.body.email,req.body.password,process.env.AA_PREFIX);
+    let data=await aa(req.body.username,req.body.password,process.env.AA_PREFIX);
     const token = generateAccessToken({
       email: data.email,
       uid: data.uid,
