@@ -336,103 +336,110 @@ app.get('/userdata',
     res.status(200).json(user);
   })
 );
-app.get('/prefs/:name',
-  asyncHandler(async function(req, res) {
-    const getPref=async function(user,pref) {
-      const result=await runner.query(req,`
-        {
-          allPreferences (condition: { user:"${user}" pref:"${pref}" }) {
-            nodes {
-              value
-            }
-          }
-        }`
-      );
-      if (result.errors)
-        return result;
-      if (result.data.allPreferences.nodes.length==0)
-        return null;
-      return result.data.allPreferences.nodes[0].value;
-    };
 
-    let result;
+// app.get('/prefs/:name',
+//   asyncHandler(async function(req, res) {
+//     const getPref=async function(user,pref) {
+//       const result=await runner.query(req,`
+//         {
+//           allPreferences (condition: { user:"${user}" pref:"${pref}" }) {
+//             nodes {
+//               value
+//             }
+//           }
+//         }`
+//       );
+//       if (result.errors)
+//         return result;
+//       if (result.data.allPreferences.nodes.length==0)
+//         return null;
+//       return result.data.allPreferences.nodes[0].value;
+//     };
+
+//     let result;
     
-    result=await getPref(req.user.uid,req.params.name);
-    if (result && result.errors) {
-      res.status(500).send(result);
-      return;
-    }
-    if (result) {
-      res.status(200).send(result);
-      return;
-    }
+//     result=await getPref(req.user.uid,req.params.name);
+//     if (result && result.errors) {
+//       res.status(500).send(result);
+//       return;
+//     }
+//     if (result) {
+//       res.status(200).send(result);
+//       return;
+//     }
 
-    result=await getPref("@"+req.user.role,req.params.name);
-    if (result && result.errors) {
-      res.status(500).send(result);
-      return;
-    }
-    if (result) {
-      res.status(200).send(result);
-      return;
-    }
+//     result=await getPref("@"+req.user.role,req.params.name);
+//     if (result && result.errors) {
+//       res.status(500).send(result);
+//       return;
+//     }
+//     if (result) {
+//       res.status(200).send(result);
+//       return;
+//     }
 
-    result=await getPref("*",req.params.name);
-    if (result && result.errors) {
-      res.status(500).send(result);
-      return;
-    }
-    if (result) {
-      res.status(200).send(result);
-      return;
-    }
+//     result=await getPref("*",req.params.name);
+//     if (result && result.errors) {
+//       res.status(500).send(result);
+//       return;
+//     }
+//     if (result) {
+//       res.status(200).send(result);
+//       return;
+//     }
 
-    res.status(200).send("");
-  })
-);
-app.put('/prefs/:name',
-  asyncHandler(async function(req, res) {
-    if (!req.body) return res.status(400).json({ message: "Missing body" });
+//     res.status(200).send("");
+//   })
+// );
+// app.put('/prefs/:name',
+//   asyncHandler(async function(req, res) {
+//     if (!req.body) return res.status(400).json({ message: "Missing body" });
 
-    const resultDel = await runner.query(req,`
-      mutation {
-        deletePreferenceByUserAndPref(input: { user: "${req.user.uid}" pref: "${req.params.name}" }) {
-          deletedPreferenceId
-        }
-      }`
-    );
+//     const resultDel = await runner.query(req,`
+//       mutation {
+//         deletePreferenceByUserAndPref(input: { user: "${req.user.uid}" pref: "${req.params.name}" }) {
+//           deletedPreferenceId
+//         }
+//       }`
+//     );
 
-    if (resultDel.errors && !resultDel.errors[0].message.includes("because no values you can delete were found matching these criteria")) {
-      res.status(500).send(resultDel);
-      return;
-    }
+//     if (resultDel.errors && !resultDel.errors[0].message.includes("because no values you can delete were found matching these criteria")) {
+//       res.status(500).send(resultDel);
+//       return;
+//     }
 
-    const result = await runner.query(req,`
-      mutation {
-        createPreference(
-          input: {
-            preference: {
-              user: "${req.user.uid}",
-              pref: "${req.params.name}",
-              value: "${req.body}"
-            }
-          }
-        ) {
-          preference {
-            user
-            pref
-            value
-          }
-        }
-      }`
-    );
+//     const result = await runner.query(req,`
+//       mutation {
+//         createPreference(
+//           input: {
+//             preference: {
+//               user: "${req.user.uid}",
+//               pref: "${req.params.name}",
+//               value: "${req.body}"
+//             }
+//           }
+//         ) {
+//           preference {
+//             user
+//             pref
+//             value
+//           }
+//         }
+//       }`
+//     );
     
-    if (result.errors)
-      res.status(500).send(result);
-    else
-      res.status(200).send("OK");
-  })
-);
+//     if (result.errors)
+//       res.status(500).send(result);
+//     else
+//       res.status(200).send("OK");
+//   })
+// );
+
+app.use('/graphql', function (req, res, next) {
+  req.body.query=req.body.query.replace("§uid",req.user.uid);
+  req.body.query=req.body.query.replace("§email",req.user.email);
+  next();
+});
 
 app.use(postgraphile(
     process.env.DATABASE_URL || "postgres://user:pass@host:5432/dbname",
@@ -447,6 +454,8 @@ app.use(postgraphile(
       graphqlRoute: "/graphql",
       pgSettings: async req => ({
         'role': req.user.role,
+        'user.uid': req.user.uid,
+        'user.email': req.user.email,
       }),
       appendPlugins: [PgOrderByRelatedPlugin,ConnectionFilterPlugin]
     }
