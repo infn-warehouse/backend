@@ -18,6 +18,10 @@ import https from 'https'
 import { makeQueryRunner } from "./QueryRunner.cjs";
 import meter from 'stream-meter';
 import bodyParser from 'body-parser'
+import {
+  AtomicMutationsPlugin,
+  getMutationAtomicityContext,
+} from 'postgraphile-plugin-atomic-mutations';
 
 // load env file
 dotenv.config();
@@ -457,7 +461,13 @@ app.use(postgraphile(
         'user.uid': req.user.uid,
         'user.email': req.user.email,
       }),
-      appendPlugins: [PgOrderByRelatedPlugin,ConnectionFilterPlugin]
+      appendPlugins: [PgOrderByRelatedPlugin,ConnectionFilterPlugin,AtomicMutationsPlugin],
+      async additionalGraphQLContextFromRequest(req, res) {
+        return {
+          // Additional context needed by the plugin
+          mutationAtomicityContext: getMutationAtomicityContext(req),
+        };
+      },
     }
 ));
 
