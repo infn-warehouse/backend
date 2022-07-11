@@ -27,6 +27,14 @@ import {
 dotenv.config();
 console.log("DATABASE_URL: "+process.env.DATABASE_URL)
 
+function formatPayload(payload) {
+  let s="";
+  Object.keys(payload).forEach(key => {
+    s+=`${key}: "${payload[key]}"`;
+  });
+  return s;
+}
+
 // graphile
 const runner = await makeQueryRunner(
   process.env.DATABASE_URL || "postgres://user:pass@host:5432/dbname",
@@ -272,10 +280,10 @@ app.put('/alfresco/:filename',
   asyncHandler(async function(req, res, next) {
     let webdavClient=createWebdavClient(req.user.uid,req.user.password);
 
-    let fileGroup;
+    let payload;
     const bb = busboy({ headers: req.headers });
     bb.on('field', (name, val, info) => {
-      if (name=="fileGroup") fileGroup=val;
+      if (name=="payload") payload=JSON.parse(val);
     });
     bb.on('file', (fieldname, file, info) => {
       console.log(`Upload of '${info.filename}' started`);
@@ -296,7 +304,7 @@ app.put('/alfresco/:filename',
                   user: "${req.user.email}",
                   name: "${req.params.filename}",
                   size: "${m.bytes}",
-                  fileGroup: "${fileGroup}"
+                  ${formatPayload(payload)}
                 }
               }
             ) {
